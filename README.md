@@ -39,6 +39,8 @@ The models presented herein constitute the foundation of our Open Source Agricul
 
 # pywisconet
 
+Check an example of how to integrate our API into your workflow
+[API CALL EXAMPLE](https://github.com/UW-Madison-DSI/pywisconet/blob/main/materials/example_callapi.ipynb)
 
 ## usage
 ```python
