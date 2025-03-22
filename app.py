@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import numpy as np
 import asyncio
 import time
+
 from pywisconet.data import *
 from pywisconet.process import *
 
@@ -102,7 +103,7 @@ def bulk_measures_query(
                 this_station_fields,
                 criteria=[MeasureType.WIND_SPEED, CollectionFrequency[frequency], Units.METERSPERSECOND]
             )
-        print('filtered_field_standard_names ', filtered_field_standard_names)
+
         # Fetch data for the date range
         bulk_measure_response = bulk_measures(
             station_id,
@@ -110,12 +111,11 @@ def bulk_measures_query(
             end_date,
             filtered_field_standard_names
         )
-        print('Bulk measure response: ', bulk_measure_response)
         df = bulk_measures_to_df(bulk_measure_response)
         df['collection_time_utc'] = pd.to_datetime(df['collection_time']).dt.tz_localize('UTC')
         df['collection_time_ct'] = df['collection_time_utc'].dt.tz_convert('US/Central')
         df['hour_ct'] = df['collection_time_ct'].dt.hour
-        print(df[cols].to_dict(orient="records"))
+        
         return df[cols].to_dict(orient="records")
 
 
@@ -138,7 +138,6 @@ def stations_query(
     try:
         start_date = datetime.strptime(start_date.strip(), "%Y-%m-%d").replace(tzinfo=ZoneInfo("UTC"))
         result = all_stations(min_days_active, start_date)
-        print(result)
         if result is None:
             raise HTTPException(status_code=404, detail="Stations not found")
         return result
@@ -197,14 +196,9 @@ def all_data_from_wisconet_query(
         dict: Cleaned weather data as JSON serializable records.
     """
     try:
-        start_time = time.time()
         #df = retrieve_tarspot_all_stations_optimized(input_date=forecasting_date, input_station_id=station_id, days=risk_days)
         df = main(input_date=forecasting_date, input_station_id=station_id, days=risk_days)
-        print("----------------------------")
-        print(df[['station_id','forecasting_date','fe_risk']])
         df_cleaned = df.replace([np.inf, -np.inf, np.nan], None).where(pd.notnull(df), None)
-        elapsed_time = time.time() - start_time  # Calculate elapsed time
-        print(f"Execution time: {elapsed_time} seconds")
         return df_cleaned.to_dict(orient="records")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid input: {e}")
@@ -214,7 +208,7 @@ def all_data_from_wisconet_query(
 # Root endpoint
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Wisconsin Weather API"}
+    return {"message": "Welcome to our Open Source Crop-Disease Forecasting Tool API"}
 
 # Create a WSGI application
 from starlette.applications import Starlette
