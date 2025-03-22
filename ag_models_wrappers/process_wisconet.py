@@ -232,66 +232,6 @@ async def one_day_measurements_async(session, station_id, end_time, days):
         return None
 
 
-async def process_stations_in_batches1(session, station_ids, input_date, days, batch_size=None, delay=0.5):
-    """Process stations in batches with improved concurrency and error handling"""
-    if not station_ids:
-        return None
-
-    # Use provided batch size or calculate optimal size based on system
-    BATCH_SIZE = batch_size or min(100, os.cpu_count() * 5)
-
-    all_results = []
-    total_batches = (len(station_ids) + BATCH_SIZE - 1) // BATCH_SIZE
-    failed_stations = 0
-
-    # Use tqdm if available for progress tracking
-    try:
-        from tqdm.asyncio import tqdm_asyncio
-        use_tqdm = True
-    except ImportError:
-        use_tqdm = False
-
-    # Semaphore to limit concurrent connections
-    sem = asyncio.Semaphore(min(BATCH_SIZE, 50))
-
-    async def fetch_with_semaphore(station_id):
-        async with sem:
-            try:
-                return await one_day_measurements_async(session, station_id, input_date, days)
-            except Exception as e:
-                nonlocal failed_stations
-                failed_stations += 1
-                print(f"Error processing station {station_id}: {str(e)}")
-                return None
-
-    for batch_num, i in enumerate(range(0, len(station_ids), BATCH_SIZE)):
-        batch = station_ids[i:i + BATCH_SIZE]
-        print(f"Processing batch {batch_num + 1}/{total_batches} with {len(batch)} stations")
-
-        # Create tasks with semaphore control
-        tasks = [fetch_with_semaphore(station_id) for station_id in batch]
-
-        # Run batch with progress tracking if available
-        if use_tqdm:
-            batch_results = await tqdm_asyncio.gather(*tasks)
-        else:
-            batch_results = await asyncio.gather(*tasks)
-
-        # Filter and extend results
-        valid_results = [res for res in batch_results if res is not None]
-        all_results.extend(valid_results)
-
-        # Adaptive delay: increase if we're seeing failures
-        if failed_stations > 0 and i + BATCH_SIZE < len(station_ids):
-            await asyncio.sleep(delay * (1 + (failed_stations / len(batch))))
-        elif i + BATCH_SIZE < len(station_ids):
-            await asyncio.sleep(delay)
-
-    success_rate = len(all_results) / len(station_ids) * 100
-    print(f"Completed processing {len(all_results)}/{len(station_ids)} stations successfully ({success_rate:.1f}%)")
-
-    return all_results if all_results else None
-
 # New function to process stations in batches
 async def process_stations_in_batches(session, station_ids, input_date, days):
     """Process stations in batches rather than one at a time"""
